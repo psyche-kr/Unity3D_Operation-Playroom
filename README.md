@@ -43,3 +43,12 @@
 
 
 
+
+
+## 담당 파트 (권용준)
+
+팀 프로젝트에서 **점령 시스템**, **건물 시스템**, **건물·사운드 데이터 구성**을 맡았습니다. 코드는 `Operation_Playroom/Assets/@Yongjun`에 있습니다.
+
+- **점령 시스템** (`OccupySystem.cs`, `OccupyManager.cs`): 구역에 자원이 3개 모인 팀이 구역을 점령하고 건물이 올라옵니다. 서버가 구역 반경 안의 자원을 `OverlapSphere`로 감지해 팀별 카운트(`NetworkVariable`)를 올립니다. 카운트는 서버만 쓰고(`WritePermission.Server`) 클라이언트는 읽기만 하며, 점령 결과는 `ClientRpc`로 전달해 구역 색을 바꿉니다.
+- **건물 시스템** (`Building.cs`): 체력을 `NetworkVariable`로 두고 피해는 `ServerRpc`로 받아 서버에서만 깎습니다. 체력 비율이 60%, 20% 아래로 내려갈 때마다 메시가 온전, 파손, 심한 파손으로 바뀌고, 체력이 0이 되면 파괴 연출 뒤 구역이 중립으로 돌아갑니다.
+- **데이터 구성** (`BuildingScriptableObject.cs`, `SoundScriptableObject.cs`, `OccupyScriptableObject.cs`): 건물 체력, 단계별 메시, 효과음 목록, 팀별 건물 프리팹을 `ScriptableObject`로 분리해 수치를 코드 밖에서 조정할 수 있게 했습니다.
