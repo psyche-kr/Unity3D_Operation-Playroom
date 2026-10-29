@@ -27,6 +27,10 @@ public class Building : NetworkBehaviour
     public Owner buildingOwner;
 
     NoiseCheckManager noise;
+
+    // 소음 매니저는 처음 필요할 때 한 번만 찾아 캐싱
+    NoiseCheckManager Noise => noise != null ? noise : (noise = FindFirstObjectByType<NoiseCheckManager>());
+
     void Start()
     {
         meshFilter = GetComponent<MeshFilter>();
@@ -79,7 +83,6 @@ public class Building : NetworkBehaviour
     public void BuildingInit()
     {
         health.Value = buildingData.health;
-        Debug.Log(health.Value);
 
         StartCoroutine(RaiseBuilding(2f));
     }
@@ -90,11 +93,9 @@ public class Building : NetworkBehaviour
         Vector3 startPos = new Vector3(0, -25f, 0);
         Vector3 targetPos = new Vector3(0f, 5f, 0f);
 
-        if (noise == null)
-            noise = FindFirstObjectByType<NoiseCheckManager>();
-        noise.SubmitNoiseTo(2);
+        Noise.SubmitNoiseTo(2);
         GameObject buildEffect = Managers.Resource.Instantiate("BuildingSmokeEffect", null, true);
-        ActiveNetworkObjectClientRpc(buildEffect.GetComponent<NetworkObject>().NetworkObjectId, true);
+        SetActiveOnClients(buildEffect, true);
         if (buildEffect.GetComponent<NetworkObject>().TrySetParent(transform.parent, true))
         {
             buildEffect.transform.localPosition = Vector3.zero;
@@ -111,17 +112,17 @@ public class Building : NetworkBehaviour
         transform.localPosition = targetPos;
 
         Managers.Pool.Push(buildEffect);
-        ActiveNetworkObjectClientRpc(buildEffect.GetComponent<NetworkObject>().NetworkObjectId, false);
+        SetActiveOnClients(buildEffect, false);
 
         GameObject sparkleEffect = Managers.Resource.Instantiate("BuildCompleteEffect");
-        ActiveNetworkObjectClientRpc(sparkleEffect.GetComponent<NetworkObject>().NetworkObjectId, true);
+        SetActiveOnClients(sparkleEffect, true);
         if (sparkleEffect.GetComponent<NetworkObject>().TrySetParent(transform, true))
         {
             sparkleEffect.transform.localPosition = Vector3.zero;
             yield return new WaitForSeconds(0.5f);
             Managers.Pool.Push(sparkleEffect);
-            ActiveNetworkObjectClientRpc(sparkleEffect.GetComponent<NetworkObject>().NetworkObjectId, false);
-        };
+            SetActiveOnClients(sparkleEffect, false);
+        }
         isDestruction = false;
     }
 
@@ -129,10 +130,8 @@ public class Building : NetworkBehaviour
     {
         GetComponentInParent<OccupySystem>().ResetOwnership();
         GameObject destructionEffect = Managers.Resource.Instantiate("BuildingDestroyEffect", null, true);
-        if (noise == null)
-            noise = FindFirstObjectByType<NoiseCheckManager>();
-        noise.SubmitNoiseTo(2);
-        ActiveNetworkObjectClientRpc(destructionEffect.GetComponent<NetworkObject>().NetworkObjectId, true);
+        Noise.SubmitNoiseTo(2);
+        SetActiveOnClients(destructionEffect, true);
         if (destructionEffect.GetComponent<NetworkObject>().TrySetParent(transform.parent, true))
         {
             destructionEffect.transform.localPosition = Vector3.zero;
@@ -147,9 +146,15 @@ public class Building : NetworkBehaviour
     {
         yield return new WaitForSeconds(time);
         Managers.Pool.Push(effect);
-        ActiveNetworkObjectClientRpc(effect.GetComponent<NetworkObject>().NetworkObjectId, false);
+        SetActiveOnClients(effect, false);
         Managers.Pool.Push(gameObject);
-        ActiveNetworkObjectClientRpc(GetComponent<NetworkObject>().NetworkObjectId, false);
+        SetActiveOnClients(gameObject, false);
+    }
+
+    // 서버에서 만든 오브젝트의 활성 상태를 모든 클라이언트에 맞춘다
+    void SetActiveOnClients(GameObject target, bool isActive)
+    {
+        ActiveNetworkObjectClientRpc(target.GetComponent<NetworkObject>().NetworkObjectId, isActive);
     }
 
     [ClientRpc]
@@ -190,20 +195,9 @@ public class Building : NetworkBehaviour
 
         currentState = state;
 
-        switch (state)
-        {
-            case 3:
-                meshFilter.mesh = buildingData.defaultMesh;
-                break;
-
-            case 2:
-                meshFilter.mesh = buildingData.brokenMesh;
-                break;
-
-            case 1:
-                meshFilter.mesh = buildingData.hardBrokenMesh;
-                break;
-        }
+        meshFilter.mesh = state == 3 ? buildingData.defaultMesh
+                        : state == 2 ? buildingData.brokenMesh
+                        : buildingData.hardBrokenMesh;
     }
 
     [ClientRpc]
@@ -221,13 +215,13 @@ public class Building : NetworkBehaviour
     IEnumerator PlayDamageEffect()
     {
         GameObject damageEffect = Managers.Resource.Instantiate("BuildingDamageEffect", null, true);
-        ActiveNetworkObjectClientRpc(damageEffect.GetComponent<NetworkObject>().NetworkObjectId, true);
+        SetActiveOnClients(damageEffect, true);
         if (damageEffect.GetComponent<NetworkObject>().TrySetParent(transform.parent, true))
         {
             damageEffect.transform.localPosition = Vector3.zero;
             yield return new WaitForSeconds(1f);
             Managers.Pool.Push(damageEffect);
-            ActiveNetworkObjectClientRpc(damageEffect.GetComponent<NetworkObject>().NetworkObjectId, false);
+            SetActiveOnClients(damageEffect, false);
         }
     }
 }
